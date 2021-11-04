@@ -5,3 +5,5 @@ const instance = axios.create({
 })
 
 export const getProducts = () => instance.get('products')
+export const getProductsInCategory = (category) =>
+  instance.get(`products/category/${category}`)

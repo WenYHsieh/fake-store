@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import styled from 'styled-components'
+import { getProducts, getProductsInCategory } from './api'
+import ProductItem from './components/ProductItem'
 
 const PageWrapper = styled.div`
   width: 90%;
@@ -11,12 +13,18 @@ const HeaderWrapper = styled.div`
 `
 
 const SearchBarWrapper = styled.div`
-  background-color: #cbeafa;
+  background-color: azure;
   padding: 20px 10px;
+  position: sticky;
+  top: 0;
 `
 const SearchBar = styled.input`
   width: 80%;
-  height: 35px;
+  padding: 10px;
+  color: gray;
+  &:focus {
+    outline: none;
+  }
 `
 const CarouselWrapper = styled.div`
   border: 1px solid black;
@@ -39,10 +47,16 @@ const ArrowLeft = styled.div`
   background-color: blue;
 `
 const CountDown = styled.div`
-  border: 1px solid black;
-  background-color: white;
+  background-color: azure;
   height: 5vh;
   margin: 10px 0px;
+  padding: 10px;
+  line-height: 5vh;
+  color: gray;
+  font-weight: bold;
+  text-align: center;
+  border-radius: 10px;
+  font-size: 20px;
 `
 
 const ProductsWrapper = styled.div`
@@ -57,9 +71,10 @@ const ProductsFilter = styled.div`
   height: 30px;
   text-align: center;
   color: gray;
+  line-height: 30px;
   &:hover {
     cursor: pointer;
-    background-color: #cbeafa;
+    background-color: azure;
   }
 `
 const ProductCardsWrapper = styled.div`
@@ -67,112 +82,7 @@ const ProductCardsWrapper = styled.div`
   width: 90%;
   flex-wrap: wrap;
 `
-const ProductCard = styled.div`
-  width: 180px;
-  height: 180px;
-  border: 1px solid black;
-  margin: 10px;
-  overflow: hidden;
-  &:before {
-    content: '';
-    background-color: none;
-    transition: 0.5s;
-  }
-  &:hover {
-    cursor: pointer;
-    &:before {
-      content: '';
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background-color: rgba(255, 255, 255, 0.3);
-    }
-  }
-  position: relative;
-`
-const ProductImg = styled.img`
-  width: 100%;
-  object-fit: cover;
-  ${(props) =>
-    props.$isInfoWindow &&
-    `
-    width: 50%
-  `}
-`
-const ProductTitle = styled.div`
-  width: 100%;
-  height: 20px;
-  color: black;
-  font-weight: bold;
-  padding: 5px;
-  ${(props) =>
-    !props.$isInfoWindow &&
-    `
-    width: 100%;
-    height: 20px;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    white-space: wrap;
-    position: absolute;
-    bottom: 10px;
-    padding: 3px;
-    background-color: rgba(0, 0, 0, 0.6);
-    color: white;
-  `};
-`
-const ProductInfoWindow = styled.div`
-  width: 450px;
-  height: 450px;
-  border: 1px solid gray;
-  position: fixed;
-  box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
-  background-color: white;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 10;
-  display: none;
-  padding: 10px;
-  ${(props) => props.$isProductInfoOpen && `display:block`}
-`
 
-const ProductInfo = styled.div`
-  ${(props) =>
-    props.$isInfoWindow &&
-    `
-    padding:10px;
-    display: flex;
-    border-bottom: 1px solid gray
-    
-  `}
-`
-const ProductDesc = styled.div`
-  width: 80%;
-  margin: 20px auto 0px auto;
-  overflow: scroll;
-`
-const ProductStatus = styled.div`
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  margin-left: 10px;
-`
-const CloseBtn = styled.div`
-  width: 10px;
-  height: 10px;
-  margin-bottom: 10px;
-  position: relative;
-  top: 10px;
-  left: 10px;
-  transition: 0.5s;
-  font-size: 20px;
-  &:hover {
-    cursor: pointer;
-    color: gray;
-  }
-`
 const Mask = styled.div`
   position: fixed;
   top: 0;
@@ -186,88 +96,128 @@ const Mask = styled.div`
 
 function App() {
   const [isProductInfoOpen, setIsProductInfoOpen] = useState(false)
-  const testProduct = [
-    {
-      id: 1,
-      title: 'Fjallraven - Foldsack No. 1 Backpack, Fits 15 Laptops',
-      price: 109.95,
-      description:
-        'Your perfect pack for everyday use and walks in the forest. Stash your laptop (up to 15 inches) in the padded sleeve, your everyday',
-      category: "men's clothing",
-      image: 'https://fakestoreapi.com/img/81fPKd-2AYL._AC_SL1500_.jpg',
-      rating: {
-        rate: 3.9,
-        count: 120,
-      },
-    },
-  ]
-  const handleProductOnClick = (displayMode) => {
-    if (displayMode) return setIsProductInfoOpen(!isProductInfoOpen)
-    setIsProductInfoOpen(false)
+  const [productInfos, setProductInfos] = useState([])
+  const [filteredProducts, setFilteredProducts] = useState([])
+  const [currentOnClickId, setCurrentOnClickId] = useState(null)
+  const [countDown, setCountDown] = useState('')
+  const [keyWord, setKeyWord] = useState('')
+
+  useEffect(() => {
+    getProducts()
+      .then((res) => {
+        setProductInfos(res.data)
+      })
+      .catch(() => {
+        alert('Oops, something went wrong!')
+      })
+  }, [])
+
+  const handleProductOnClick = (props) => {
+    if (typeof props === 'boolean') return setIsProductInfoOpen(false)
+    setCurrentOnClickId(parseInt(props.target.id))
+    setIsProductInfoOpen(!isProductInfoOpen)
   }
+
+  const handleFilter = (e) => {
+    let currentFilter = e.target.getAttribute('name')
+    getProductsInCategory(currentFilter)
+      .then((res) => {
+        setProductInfos(res.data)
+      })
+      .catch(() => {
+        alert('Oops, something went wrong!')
+      })
+  }
+
+  const handleKeyWordChange = (e) => {
+    setKeyWord(e.target.value)
+  }
+
+  const handleSearch = () => {
+    setFilteredProducts(
+      productInfos.filter((product) => {
+        return product.title.toLowerCase().indexOf(keyWord.toLowerCase()) !== -1
+      })
+    )
+  }
+
+  const countDownDate = new Date('Jan 1, 2022 22:22:22').getTime()
+  useEffect(() => {
+    let handleCountDown = setInterval(() => {
+      let now = new Date().getTime()
+      let distance = countDownDate - now
+      let days = Math.floor(distance / (1000 * 60 * 60 * 24))
+      let hours = Math.floor(
+        (distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+      )
+      let minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60))
+      let seconds = Math.floor((distance % (1000 * 60)) / 1000)
+
+      setCountDown(`${days}d ${hours}h ${minutes}m ${seconds}s`)
+
+      if (distance < 0) {
+        clearInterval(handleCountDown)
+        setCountDown('Happy new year~')
+      }
+    }, 1000)
+    return () => clearInterval(handleCountDown)
+  }, [countDownDate])
+
   return (
     <>
       <PageWrapper>
-        <button
-          onClick={() => {
-            console.log(isProductInfoOpen)
-          }}
-        >
-          debug
-        </button>
+        <SearchBarWrapper>
+          <SearchBar
+            placeholder='please input keyword ...'
+            onChange={(e) => {
+              handleKeyWordChange(e)
+            }}
+          />
+          <button onClick={handleSearch}>search</button>
+        </SearchBarWrapper>
         <HeaderWrapper>
-          <SearchBarWrapper>
-            <SearchBar />
-          </SearchBarWrapper>
           <CarouselWrapper>
             <ArrowLeft />
             <Carousel src='https://images.unsplash.com/photo-1421790500381-fc9b5996f343?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2787&q=80' />
             <ArrowLeft />
           </CarouselWrapper>
         </HeaderWrapper>
-        <CountDown>倒數</CountDown>
+        <CountDown>{countDown}</CountDown>
         <ProductsWrapper>
-          <ProductsFilterWrapper>
-            <ProductsFilter> Electronics</ProductsFilter>
-            <ProductsFilter> Jewelery</ProductsFilter>
-            <ProductsFilter> Men's clothing</ProductsFilter>
-            <ProductsFilter> Women's clothing</ProductsFilter>
+          <ProductsFilterWrapper
+            onClick={(e) => {
+              handleFilter(e)
+            }}
+          >
+            <ProductsFilter name='electronics'>Electronics</ProductsFilter>
+            <ProductsFilter name='jewelery'> Jewelery</ProductsFilter>
+            <ProductsFilter name="men's clothing">
+              Men's clothing
+            </ProductsFilter>
+            <ProductsFilter name="women's clothing">
+              Women's clothing
+            </ProductsFilter>
           </ProductsFilterWrapper>
           <ProductCardsWrapper>
-            <ProductCard onClick={handleProductOnClick}>
-              <ProductImg src={testProduct[0].image} />
-              <ProductTitle>{testProduct[0].title}</ProductTitle>
-            </ProductCard>
-            <ProductInfoWindow $isProductInfoOpen={isProductInfoOpen}>
-              <CloseBtn onClick={() => handleProductOnClick(false)}>X</CloseBtn>
-              <ProductInfo $isInfoWindow>
-                <ProductImg src={testProduct[0].image} $isInfoWindow />
-                <ProductStatus>
-                  <ProductTitle $isInfoWindow>
-                    {testProduct[0].title}
-                  </ProductTitle>
-                  <div>
-                    Price: $ {testProduct[0].price}
-                    <br />
-                    In stock: {testProduct[0].rating.count}
-                  </div>
-                </ProductStatus>
-              </ProductInfo>
-              <ProductDesc $isInfoWindow>
-                {testProduct[0].description}
-              </ProductDesc>
-            </ProductInfoWindow>
-            <ProductCard>商品</ProductCard>
-            <ProductCard>商品</ProductCard>
-            <ProductCard>商品</ProductCard>
-            <ProductCard>商品</ProductCard>
-            <ProductCard>商品</ProductCard>
-            <ProductCard>商品</ProductCard>
-            <ProductCard>商品</ProductCard>
-            <ProductCard>商品</ProductCard>
-            <ProductCard>商品</ProductCard>
-            <ProductCard>商品</ProductCard>
-            <ProductCard>商品</ProductCard>
+            {filteredProducts.length === 0
+              ? productInfos.map((product) => (
+                  <ProductItem
+                    key={product.id}
+                    product={product}
+                    handleProductOnClick={handleProductOnClick}
+                    isProductInfoOpen={isProductInfoOpen}
+                    currentOnClickId={currentOnClickId}
+                  />
+                ))
+              : filteredProducts.map((product) => (
+                  <ProductItem
+                    key={product.id}
+                    product={product}
+                    handleProductOnClick={handleProductOnClick}
+                    isProductInfoOpen={isProductInfoOpen}
+                    currentOnClickId={currentOnClickId}
+                  />
+                ))}
           </ProductCardsWrapper>
         </ProductsWrapper>
         <Mask $isProductInfoOpen={isProductInfoOpen} />
