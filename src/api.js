@@ -7,3 +7,5 @@ const instance = axios.create({
 export const getProducts = () => instance.get('products')
 export const getProductsInCategory = (category) =>
   instance.get(`products/category/${category}`)
+export const getProductAds = (id) =>
+  axios.get(`https://picsum.photos/id/${id}/info`)
