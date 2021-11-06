@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react'
 import styled from 'styled-components'
-import { getProducts, getProductsInCategory, getProductAds } from './api'
+import { getProducts } from './api'
 import ProductItem from './components/ProductItem'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faArrowCircleUp, faSearch } from '@fortawesome/free-solid-svg-icons'
-import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
-import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
-import { faTimesCircle } from '@fortawesome/free-solid-svg-icons'
-import { faArrowAltCircleUp } from '@fortawesome/free-solid-svg-icons'
+import {
+  faArrowCircleUp,
+  faArrowLeft,
+  faArrowRight,
+  faTimesCircle,
+  faSearch,
+} from '@fortawesome/free-solid-svg-icons'
+import useCountDown from './hooks/useCountDown'
+import useSearch from './hooks/useSearch'
+import useCarousel from './hooks/useCarousel'
+import useFilter from './hooks/useFilter'
 
 const PageBackground = styled.div`
   background-color: #f4f5f4;
@@ -16,8 +22,6 @@ const PageWrapper = styled.div`
   width: 80%;
   margin: 0 auto;
 `
-
-const HeaderWrapper = styled.div``
 
 const SearchBarWrapper = styled.div`
   background-color: #e2e2e2;
@@ -86,6 +90,10 @@ const CountDown = styled.div`
 
 const ProductsWrapper = styled.div`
   display: flex;
+  @media screen and (max-width: 500px) {
+    flex-direction: column;
+    align-items: center;
+  }
 `
 const ProductsFilterWrapper = styled.div`
   margin: 10px 20px 0px 0px;
@@ -106,6 +114,7 @@ const ProductCardsWrapper = styled.div`
   display: flex;
   width: 90%;
   flex-wrap: wrap;
+  justify-content: center;
 `
 
 const Mask = styled.div`
@@ -126,16 +135,16 @@ const FontAwesomeIconItem = styled(FontAwesomeIcon)`
   ${(props) =>
     (props.$arrowLeft || props.$arrowRight) &&
     `
-  position:absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background-color: rgba(0,0,0,0.1);
-  padding:10px;
-  transition: .5s;
-  &:hover{
-    color: #f4f5f4;
-    background-color: rgba(0,0,0,0.3);
-  }
+    position:absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: rgba(0,0,0,0.1);
+    padding:10px;
+    transition: .5s;
+    &:hover{
+      color: #f4f5f4;
+      background-color: rgba(0,0,0,0.3);
+    }
   `}
   ${(props) =>
     props.$arrowRight &&
@@ -170,18 +179,22 @@ const Loading = styled.div`
 function App() {
   const [isProductInfoOpen, setIsProductInfoOpen] = useState(false)
   const [productInfos, setProductInfos] = useState([])
-  const [filteredProducts, setFilteredProducts] = useState([])
-  const [currentOnClickId, setCurrentOnClickId] = useState(null)
-  const [countDown, setCountDown] = useState('')
-  const [keyWord, setKeyWord] = useState('')
-  const [productAds, setProductAds] = useState([])
-  const adIdArr = [0, 160, 250, 30, 312, 367, 486, 535, 662, 669]
-  const [currentAd, setCurrentAd] = useState(0)
+  const { countDown } = useCountDown()
   const [isLoading, setIsLoading] = useState(false)
-  const [isScrollDown, setIsScrollDown] = useState(false)
+
+  const {
+    handleKeyWordChange,
+    handleSearch,
+    handleClearSearch,
+    keyWord,
+    filteredProducts,
+  } = useSearch({ productInfos })
+  const { adIdArr, handleCurrentAd, productAds, currentAd } = useCarousel({
+    setIsLoading,
+  })
+  const { handleFilter } = useFilter({ setProductInfos, setIsLoading })
 
   useEffect(() => {
-    let adUrls = []
     setIsLoading(true)
     getProducts()
       .then((res) => {
@@ -192,99 +205,10 @@ function App() {
         setIsLoading(false)
         alert('Oops, something went wrong!')
       })
-    adIdArr.forEach((id) => {
-      getProductAds(id)
-        .then((res) => {
-          adUrls.push({ id, url: res.data.download_url })
-        })
-        .catch(() => {
-          alert('Oops, something went wrong!')
-        })
-    })
-    setProductAds(adUrls)
   }, [])
-
-  const handleProductOnClick = (props) => {
-    if (typeof props === 'boolean') return setIsProductInfoOpen(false)
-    setCurrentOnClickId(parseInt(props.target.id))
-    setIsProductInfoOpen(!isProductInfoOpen)
-  }
-
-  const handleFilter = (e) => {
-    let currentFilter = e.target.getAttribute('name')
-    setIsLoading(true)
-    getProductsInCategory(currentFilter)
-      .then((res) => {
-        setProductInfos(res.data)
-        setIsLoading(false)
-      })
-      .catch(() => {
-        setIsLoading(false)
-        alert('Oops, something went wrong!')
-      })
-  }
-
-  const handleKeyWordChange = (e) => {
-    setKeyWord(e.target.value)
-  }
-
-  const handleSearch = () => {
-    setFilteredProducts(
-      productInfos.filter((product) => {
-        return product.title.toLowerCase().indexOf(keyWord.toLowerCase()) !== -1
-      })
-    )
-  }
-
-  const handleClearSearch = () => {
-    setKeyWord('')
-  }
-
-  const countDownDate = new Date('Jan 1, 2022 22:22:22').getTime()
-  useEffect(() => {
-    let handleCountDown = setInterval(() => {
-      let now = new Date().getTime()
-      let distance = countDownDate - now
-      let days = Math.floor(distance / (1000 * 60 * 60 * 24))
-      let hours = Math.floor(
-        (distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
-      )
-      let minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60))
-      let seconds = Math.floor((distance % (1000 * 60)) / 1000)
-
-      setCountDown(`${days}d ${hours}h ${minutes}m ${seconds}s`)
-
-      if (distance < 0) {
-        clearInterval(handleCountDown)
-        setCountDown('Happy new year~')
-      }
-    }, 1000)
-    return () => clearInterval(handleCountDown)
-  }, [countDownDate])
-
-  const handleCurrentAd = (e) => {
-    if (e.target.getAttribute('id'))
-      setCurrentAd(parseInt(e.target.getAttribute('id')))
-    let currentAdIndex = adIdArr.indexOf(currentAd)
-    if (e.target.getAttribute('name') === 'left') {
-      currentAdIndex > 0
-        ? setCurrentAd(parseInt(adIdArr[currentAdIndex - 1]))
-        : setCurrentAd(parseInt(adIdArr[9]))
-    }
-    if (e.target.getAttribute('name') === 'right') {
-      currentAdIndex < 9
-        ? setCurrentAd(parseInt(adIdArr[currentAdIndex + 1]))
-        : setCurrentAd(parseInt(adIdArr[0]))
-    }
-  }
 
   const handleBackToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
-    window.onscroll = () => {
-      setIsScrollDown(
-        document.body.scrollTop > 20 || document.documentElement.scrollTop > 20
-      )
-    }
   }
 
   return (
@@ -313,39 +237,38 @@ function App() {
               onClick={handleClearSearch}
             />
           </SearchBarWrapper>
-          <HeaderWrapper>
-            <CarouselWrapper
-              onClick={(e) => {
-                handleCurrentAd(e)
-              }}
-            >
-              <FontAwesomeIconItem
-                icon={faArrowLeft}
-                size='5x'
-                color='gray'
-                $arrowLeft
-                name='left'
-              />
-              <Carousel
-                src={
-                  productAds.length !== 0 &&
-                  productAds.find((ad) => ad.id === currentAd).url
-                }
-              />
-              <CarouselDotContainer>
-                {adIdArr.map((id) => (
-                  <CarouselDot key={id} id={id} $active={id === currentAd} />
-                ))}
-              </CarouselDotContainer>
-              <FontAwesomeIconItem
-                icon={faArrowRight}
-                size='5x'
-                color='gray'
-                $arrowRight
-                name='right'
-              />
-            </CarouselWrapper>
-          </HeaderWrapper>
+          <CarouselWrapper
+            onClick={(e) => {
+              handleCurrentAd(e)
+            }}
+          >
+            <FontAwesomeIconItem
+              icon={faArrowLeft}
+              size='5x'
+              color='gray'
+              $arrowLeft
+              name='left'
+            />
+            <Carousel
+              src={
+                productAds.length !== 0
+                  ? productAds.find((ad) => ad.id === currentAd).url
+                  : null
+              }
+            />
+            <CarouselDotContainer>
+              {adIdArr.map((id) => (
+                <CarouselDot key={id} id={id} $active={id === currentAd} />
+              ))}
+            </CarouselDotContainer>
+            <FontAwesomeIconItem
+              icon={faArrowRight}
+              size='5x'
+              color='gray'
+              $arrowRight
+              name='right'
+            />
+          </CarouselWrapper>
           <CountDown>{countDown}</CountDown>
           <ProductsWrapper>
             <ProductsFilterWrapper
@@ -368,18 +291,16 @@ function App() {
                     <ProductItem
                       key={product.id}
                       product={product}
-                      handleProductOnClick={handleProductOnClick}
                       isProductInfoOpen={isProductInfoOpen}
-                      currentOnClickId={currentOnClickId}
+                      setIsProductInfoOpen={setIsProductInfoOpen}
                     />
                   ))
                 : filteredProducts.map((product) => (
                     <ProductItem
                       key={product.id}
                       product={product}
-                      handleProductOnClick={handleProductOnClick}
                       isProductInfoOpen={isProductInfoOpen}
-                      currentOnClickId={currentOnClickId}
+                      setIsProductInfoOpen={setIsProductInfoOpen}
                     />
                   ))}
             </ProductCardsWrapper>
@@ -390,7 +311,6 @@ function App() {
             size='8x'
             color='gray'
             $arrowUp
-            $display={isScrollDown}
             onClick={handleBackToTop}
           />
         </PageWrapper>

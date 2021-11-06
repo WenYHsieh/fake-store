@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { useState } from 'react'
 
 const ProductCard = styled.div`
   width: 180px;
@@ -112,10 +113,16 @@ const CloseBtn = styled.div`
 
 export default function ProductItem({
   product,
-  handleProductOnClick,
+  setIsProductInfoOpen,
   isProductInfoOpen,
-  currentOnClickId,
 }) {
+  const [currentOnClickId, setCurrentOnClickId] = useState(null)
+  const handleProductOnClick = (props) => {
+    if (typeof props === 'boolean') return setIsProductInfoOpen(false)
+    setCurrentOnClickId(parseInt(props.target.id))
+    setIsProductInfoOpen(!isProductInfoOpen)
+  }
+
   return (
     <>
       <ProductCard
