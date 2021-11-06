@@ -15,7 +15,7 @@ export default function useCarousel({ setIsLoading }) {
           adUrls.push({ id, url: res.data.download_url })
         })
         .catch(() => {
-          alert('Oops, something went wrong!')
+          // alert('Oops, something went wrong!')
         })
     })
     setProductAds(adUrls)
